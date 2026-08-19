@@ -1,0 +1,120 @@
+#!/bin/sh
+# helix — resolves the Team Helix binary, then hands off to it.
+#
+# The plugin ships this script, not the 23 MB binary: committing four
+# platform builds per release would grow every clone of the marketplace
+# forever. The real binary is fetched once, from the GitHub release matching
+# this plugin's version, and verified against bin/checksums.txt.
+#
+# Resolution order:
+#   1. $HELIX_BIN                    explicit override
+#   2. <root>/go/bin/helix           development tree (make -C go build)
+#   3. $HELIX_HOME/bin/helix-<ver>   already fetched
+#   4. download, verify, cache, run
+#
+# The published plugin only ever reaches 3 and 4 — it carries no Go source.
+#
+# Everything this script says goes to stderr — stdout belongs to the binary,
+# because callers parse it.
+
+set -e
+
+die() { echo "helix: $*" >&2; exit 1; }
+note() { echo "helix: $*" >&2; }
+
+# --- where we are ------------------------------------------------------------
+
+self=$0
+case $self in
+  */*) self_dir=${self%/*} ;;
+  *)   self_dir=. ;;
+esac
+self_dir=$(cd "$self_dir" && pwd) || die "cannot resolve own directory"
+root=$(cd "$self_dir/.." && pwd)
+
+# --- 1. explicit override ----------------------------------------------------
+
+if [ -n "${HELIX_BIN:-}" ]; then
+  [ -x "$HELIX_BIN" ] || die "HELIX_BIN is set to '$HELIX_BIN', which is not executable"
+  exec "$HELIX_BIN" "$@"
+fi
+
+# --- 2. development tree -----------------------------------------------------
+
+[ -x "$root/go/bin/helix" ] && exec "$root/go/bin/helix" "$@"
+
+# --- 3/4. released binary ----------------------------------------------------
+
+manifest=$root/.claude-plugin/plugin.json
+[ -f "$manifest" ] || die "missing $manifest"
+
+version=$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$manifest" | head -1)
+[ -n "$version" ] || die "no version in $manifest"
+
+case $(uname -s) in
+  Darwin) os=darwin ;;
+  Linux)  os=linux ;;
+  *)      die "unsupported platform $(uname -s) — Helix runs on macOS and Linux" ;;
+esac
+
+case $(uname -m) in
+  arm64|aarch64) arch=arm64 ;;
+  x86_64|amd64)  arch=amd64 ;;
+  *)             die "unsupported architecture $(uname -m)" ;;
+esac
+
+asset=helix-$os-$arch
+cache=${HELIX_HOME:-$HOME/.helix}/bin
+bin=$cache/helix-$version-$os-$arch
+
+[ -x "$bin" ] && exec "$bin" "$@"
+
+# --- fetch -------------------------------------------------------------------
+
+sums=$root/bin/checksums.txt
+if [ ! -f "$sums" ]; then
+  # A source checkout has no checksums file: there is nothing to download
+  # against, so the answer is to build.
+  [ -f "$root/go/Makefile" ] &&
+    die "no binary yet — build it with: make -C $root/go build"
+  die "missing $sums — cannot verify a download without it"
+fi
+
+expected=$(awk -v f="$asset" '$2 == f || $2 == "*" f { print $1 }' "$sums" | head -1)
+[ -n "$expected" ] || die "no checksum for $asset in $sums"
+
+base=${HELIX_RELEASE_BASE:-https://github.com/TeamHelix-AI/helix/releases/download}
+url=$base/v$version/$asset
+
+mkdir -p "$cache" || die "cannot create $cache"
+tmp=$cache/.$asset.$$
+trap 'rm -f "$tmp"' EXIT INT TERM
+
+note "fetching helix $version for $os/$arch (once, ~23 MB)"
+
+if command -v curl >/dev/null 2>&1; then
+  curl -fsSL --retry 3 -o "$tmp" "$url" || die "download failed: $url"
+elif command -v wget >/dev/null 2>&1; then
+  wget -q -O "$tmp" "$url" || die "download failed: $url"
+else
+  die "neither curl nor wget is available"
+fi
+
+if command -v shasum >/dev/null 2>&1; then
+  actual=$(shasum -a 256 "$tmp" | cut -d' ' -f1)
+elif command -v sha256sum >/dev/null 2>&1; then
+  actual=$(sha256sum "$tmp" | cut -d' ' -f1)
+else
+  die "neither shasum nor sha256sum is available"
+fi
+
+[ "$actual" = "$expected" ] ||
+  die "checksum mismatch for $asset — expected $expected, got $actual. Not running it."
+
+chmod +x "$tmp" || die "cannot make $tmp executable"
+mv -f "$tmp" "$bin" || die "cannot install $bin"
+trap - EXIT INT TERM
+
+note "installed $bin"
+
+exec "$bin" "$@"

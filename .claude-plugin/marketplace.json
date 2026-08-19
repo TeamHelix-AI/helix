@@ -1,0 +1,16 @@
+{
+  "name": "team-helix",
+  "owner": {
+    "name": "Team Helix AI",
+    "url": "https://github.com/TeamHelix-AI"
+  },
+  "description": "Team Helix — visual surfaces for working with Claude Code agents, and the shared store and secret broker beneath them",
+  "plugins": [
+    {
+      "name": "helix",
+      "source": "./",
+      "description": "Spark, Canvas, Loop, Stream and Fleet — visual surfaces for working with Claude Code agents — plus Memory and Vault, the shared store and secret broker beneath them.",
+      "category": "productivity"
+    }
+  ]
+}
