@@ -176,7 +176,7 @@ Rules:
 2. Answered decision cards are **spent**. Re-deciding = push a *retake*
    decision, edge `superseded by` from the old one. Never edit a verdict.
 3. While building, drain and acknowledge between edits.
-4. Everything waiting on the user must be reachable via the blockers panel;
+4. Everything waiting on the user must be reachable from **your turn**;
    anything long-running on your side gets an in-progress card.
 
 ## Card reference (push JSON on stdin)
@@ -239,8 +239,12 @@ every artifact card `done`; announce it and update the session's memory.
 
 ## What the app gives the user (so you can point them at it)
 
-Amber **N waiting** chip → blockers panel, click-to-jump (jumping auto-
-unfolds whatever hides the target). **▦ index** → every card, findable:
+Amber **N waiting on you** chip → **● your turn**: every card blocking the
+session, oldest first, each headed by the action it needs (Answer, Choose,
+Ratify or decline, Tick N items) and answerable in place; ⌖ jumps to the
+card on the canvas (jumping auto-unfolds whatever hides the target). Empty
+it reads *Nothing is waiting on you* — which is the answer when a person
+asks why you are still waiting. **▦ index** → every card, findable:
 tabs by type group plus artifacts and attachments, search, stage/status
 filters, pagination; row click opens the card's full preview, ⌖ jumps back
 to the canvas focused on it. **◷ timeline** → the session in order: cards
