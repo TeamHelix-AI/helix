@@ -14,13 +14,17 @@ liveness. Agents never push to Fleet — the only agent verbs are `up` and
 
 ## CLI
 
-```
-HF="${CLAUDE_PLUGIN_ROOT}/bin/helix fleet"
+```sh
+# start/reuse THE fleet server (port 4890), open the board
+${CLAUDE_PLUGIN_ROOT}/bin/helix fleet up [--no-open]
 
-$HF up [--no-open]   # start/reuse THE fleet server (port 4890), open the board
-$HF status           # registry as JSON: {sessions:[...], attentionTotal}
+# registry as JSON: {sessions:[...], attentionTotal}
+${CLAUDE_PLUGIN_ROOT}/bin/helix fleet status
 ```
 
+- `up` opens the browser itself, from inside the binary. `--no-open` is for
+  headless or scripted runs — never a way around a permission prompt. If a
+  prompt is declined, hand the user `! open <url>` and carry on.
 - Data: `~/.helix/fleet/` (registry.json + fleet.db). Port override:
   `HELIX_FLEET_PORT` env (must match in Fleet AND the app servers).
 - `status` is the scriptable view — use it to answer "what's running /
@@ -54,5 +58,5 @@ $HF status           # registry as JSON: {sessions:[...], attentionTotal}
 
 ## When the user asks "what needs me?"
 
-Run `$HF status`, and summarize the attention items grouped by session —
+Run `${CLAUDE_PLUGIN_ROOT}/bin/helix fleet status`, and summarize the attention items grouped by session —
 don't make them open the board if a sentence answers it.

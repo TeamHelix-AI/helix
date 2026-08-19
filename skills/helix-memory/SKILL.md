@@ -23,12 +23,16 @@ promotion all exist — and why you have less power here than the person does.
 
 ## Setup
 
-Wrap the CLI in a **shell function**, not a string variable — zsh does not
-word-split an unquoted `$VAR`, so `HM="node …"` fails as one long filename:
+Call the binary by its full path every time:
 
 ```sh
-hm() { ${CLAUDE_PLUGIN_ROOT}/bin/helix memory "$@"; }
+${CLAUDE_PLUGIN_ROOT}/bin/helix memory <verb> [flags]
 ```
+
+Never put it in a shell variable or function. The skill pre-approves this
+command, and that approval stops matching past a variable assignment — wrap it
+and every call prompts instead. Prose below names commands as `memory <verb>`;
+run them with the full path.
 
 First run in a repo needs nothing. **One store per machine**, at
 `~/.helix/memory` — the same store and the same server whichever project you
@@ -49,13 +53,13 @@ memory earns its way into the core through being used.
 
 ## The commands
 
-```
-hm write --name <name> --body "<the fact>" [--type --areas --paths]
-hm search <query> [--limit 10]      keyword, widened one hop along typed edges
-hm recall <path>                    what this file brings with it
-hm core [--explain]                 what you would be given here, and why
-hm used <id>                        you acted on it — this is the control loop
-hm get <id|name> · list · doctor
+```sh
+${CLAUDE_PLUGIN_ROOT}/bin/helix memory write --name <name> --body "<the fact>" [--type --areas --paths]
+${CLAUDE_PLUGIN_ROOT}/bin/helix memory search <query> [--limit 10]   # keyword, widened one hop along typed edges
+${CLAUDE_PLUGIN_ROOT}/bin/helix memory recall <path>                 # what this file brings with it
+${CLAUDE_PLUGIN_ROOT}/bin/helix memory core [--explain]              # what you would be given here, and why
+${CLAUDE_PLUGIN_ROOT}/bin/helix memory used <id>                     # you acted on it — this is the control loop
+${CLAUDE_PLUGIN_ROOT}/bin/helix memory get <id|name> · list · doctor
 ```
 
 Add `--json` to anything. `used` and `confirm` answer with one human line and
@@ -67,8 +71,8 @@ correctly when two sessions are open on one project.
 
 ## Writing a memory worth keeping
 
-```
-hm write --name pnpm-not-npm --type feedback \
+```sh
+${CLAUDE_PLUGIN_ROOT}/bin/helix memory write --name pnpm-not-npm --type feedback \
   --paths '**/package.json' \
   --body 'Always prefer pnpm to npm.
 
@@ -104,10 +108,10 @@ Three channels, one ranking, one store:
 2. **On what you are working on** — memories bound to files in play arrive at
    the next prompt. Not at the moment a file opens: the hook that observes
    cannot add to the conversation, so observation and delivery are split.
-3. **When you search** — `hm search`, widened one hop so an answer arrives
+3. **When you search** — `memory search`, widened one hop so an answer arrives
    with its caveats attached.
 
-**Say when you used one.** `hm used <id>` is not bookkeeping — it is the whole
+**Say when you used one.** `memory used <id>` is not bookkeeping — it is the whole
 of the control loop. A memory acted on is promoted toward the core; one shown
 repeatedly and ignored is demoted; one never recalled at all decays to archive.
 If nothing ever reports use, everything decays and the store slowly empties of
@@ -117,12 +121,12 @@ the things that were working.
 
 Do not edit it quietly and move on. Either:
 
-- **`hm search`** to find it, then tell the person what it says, where it came
+- **`memory search`** to find it, then tell the person what it says, where it came
   from and who wrote it — provenance is the point;
 - or record the disagreement as an edge (`contradicts`) so it surfaces as a
   conflict rather than a silent overwrite.
 
-`hm doctor` reports broken files, dead edges and conflicts in two shapes: a
+`memory doctor` reports broken files, dead edges and conflicts in two shapes: a
 declared contradiction, and the same name asserted at more than one layer.
 
 ## Promotion is the person's
@@ -138,7 +142,7 @@ Point the person there when something deserves to be true for everyone.
 
 ## Hooks
 
-`hm hook install` prints the `settings.json` fragment. Three hooks: the core
+`memory hook install` prints the `settings.json` fragment. Three hooks: the core
 at session start, path recording after a tool runs, and delivery at the next
 prompt. They never fail loudly — a broken install looks like nothing happening,
 never like an error on every turn.
@@ -151,13 +155,13 @@ agents automatically; a resumption cursor handed to every future session would
 fill the recall budget with bookkeeping inside a week. So state is a separate
 collection, and **nothing in it ever reaches recall**.
 
-```
-hm state ns <name> --routine <r> [--visibility private|shared|scope]
-hm state set <ns> <key> --routine <r>     value on stdin, or --value
-hm state get <ns> <key> --routine <r>
-hm state list [<ns>] · rm · prune
-hm state cadence                          what ran, and what stopped
-hm state promote <ns> <key> --body "…"    turn a result into a memory
+```sh
+${CLAUDE_PLUGIN_ROOT}/bin/helix memory state ns <name> --routine <r> [--visibility private|shared|scope]
+${CLAUDE_PLUGIN_ROOT}/bin/helix memory state set <ns> <key> --routine <r>   # value on stdin, or --value
+${CLAUDE_PLUGIN_ROOT}/bin/helix memory state get <ns> <key> --routine <r>
+${CLAUDE_PLUGIN_ROOT}/bin/helix memory state list [<ns>] · rm · prune
+${CLAUDE_PLUGIN_ROOT}/bin/helix memory state cadence                        # what ran, and what stopped
+${CLAUDE_PLUGIN_ROOT}/bin/helix memory state promote <ns> <key> --body "…"  # turn a result into a memory
 ```
 
 **State belongs to a routine, not a session** — surviving from one run to the
@@ -171,12 +175,12 @@ a race rather than state.
 **Entries expire** — 30 days by default, per namespace. Bookkeeping should
 expire; nothing here is evidence.
 
-**When a result outlives its run, promote it:** `hm state promote` writes a
+**When a result outlives its run, promote it:** `memory state promote` writes a
 real memory whose provenance points back at the state entry and the session
 that produced it. That is the only path from state into recall, and it is
 deliberately something you decide rather than something that happens.
 
-**Nothing here schedules anything.** `hm state cadence` reports what a routine
+**Nothing here schedules anything.** `memory state cadence` reports what a routine
 has been doing — *last ran, usually every day, overdue* — because a routine
 that writes state on every run reveals its own rhythm. It can tell you a
 nightly job did not run last night. It cannot start one.
@@ -191,7 +195,7 @@ not apply.
 ## Sharp edges
 
 - **Nothing schedules the promotion pass.** Usage figures are as fresh as the
-  last `hm sweep`. Run it, or offer to.
+  last `memory sweep`. Run it, or offer to.
 - **A store has a team layer only if someone configured one.** Unconfigured
   means project and organisation and nothing between.
 - **Reading records that memories were shown**, which feeds demotion. Pass

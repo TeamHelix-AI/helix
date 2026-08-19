@@ -19,12 +19,16 @@ changes.
 
 ## Setup
 
-Wrap the CLI in a **shell function**, not a string variable — zsh does not
-word-split an unquoted `$VAR`, so `HV="node …"` fails as one long filename:
+Call the binary by its full path every time:
 
 ```sh
-hv() { ${CLAUDE_PLUGIN_ROOT}/bin/helix vault "$@"; }
+${CLAUDE_PLUGIN_ROOT}/bin/helix vault <verb> [flags]
 ```
+
+Never put it in a shell variable or function. The skill pre-approves this
+command, and that approval stops matching past a variable assignment — wrap it
+and every call prompts instead. Prose below names commands as `vault <verb>`;
+run them with the full path.
 
 First use creates a master key in the OS keychain. On a machine where the
 keychain prompts, the person will see a dialog — tell them it is coming rather
@@ -35,8 +39,8 @@ covers "this session" genuinely does.
 
 ## The one thing to do when you need a credential
 
-```
-hv need db/staging --reason "to run the pending migrations" --wait 300
+```sh
+${CLAUDE_PLUGIN_ROOT}/bin/helix vault need db/staging --reason "to run the pending migrations" --wait 300
 ```
 
 Then **stop**. That is the point: you hit a wall, a request is now waiting for
@@ -53,14 +57,14 @@ Three answers come back:
 
 **Never ask the person to paste a secret into the conversation.** That is the
 exact thing this exists to prevent — a value in the transcript is there forever.
-Point them at `hv pending`, or at the browser surface.
+Point them at `vault pending`, or at the browser surface.
 
 ## Using it — two paths, no third
 
 **Run a command with it:**
 
-```
-hv run --with DATABASE_URL=db/staging -- ./migrate.sh
+```sh
+${CLAUDE_PLUGIN_ROOT}/bin/helix vault run --with DATABASE_URL=db/staging -- ./migrate.sh
 ```
 
 The value is in that process's environment and nowhere else. If the command
@@ -71,7 +75,7 @@ prints it, the output is masked on the way back to you.
 ```
 # write a template of names, never values
 printf 'DATABASE_URL=${vault:db/staging}\nAPP_ENV=staging\n' > .env.template
-hv render .env.template --out .env
+${CLAUDE_PLUGIN_ROOT}/bin/helix vault render .env.template --out .env
 ```
 
 The CLI does the substitution; the value never passes through you. It refuses
@@ -83,11 +87,11 @@ around.
 
 ## What the person does
 
-```
-hv pending                                    the queue of blocked agents
-printf %s '<value>' | hv provide <req>        answer one
-hv decline <req> --reason "<why>"             a real answer
-hv list · show <name> · audit                 never a value, always a shape
+```sh
+${CLAUDE_PLUGIN_ROOT}/bin/helix vault pending                     # the queue of blocked agents
+printf %s '<value>' | ${CLAUDE_PLUGIN_ROOT}/bin/helix vault provide <req>    # answer one
+${CLAUDE_PLUGIN_ROOT}/bin/helix vault decline <req> --reason "<why>"         # a real answer
+${CLAUDE_PLUGIN_ROOT}/bin/helix vault list · show <name> · audit             # never a value, always a shape
 ```
 
 Or in the browser, which is where this is meant to happen:
@@ -119,7 +123,7 @@ with a visible expiry. Revocation stops resolution immediately.
 ## The audit log
 
 Every resolution captures **which agent, in which session, running which
-command, resolving which layer, granted by whom**. `hv audit` reads it back.
+command, resolving which layer, granted by whom**. `vault audit` reads it back.
 This is what makes "which agent touched the production database key, and when"
 answerable — it is the product, not a by-product, so do not paper over it.
 
@@ -128,7 +132,7 @@ asked to type their own name on a machine with one person on it.
 
 ## Hooks
 
-`hv hook install` prints the `settings.json` fragment:
+`vault hook install` prints the `settings.json` fragment:
 
 - **PreToolUse** rewrites shell commands to run inside a wrapper that masks this
   session's secrets out of their output. It rewrites nothing when the session

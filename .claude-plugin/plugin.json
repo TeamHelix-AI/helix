@@ -1,7 +1,7 @@
 {
   "name": "helix",
   "displayName": "Team Helix",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Visual surfaces and shared infrastructure for Claude Code: Start (routing a job to its surface), Spark (diverging), Canvas (deciding), Loop (building against a ratified bar), Stream (watching autonomous work), Fleet (mission control), Memory (what we know), Vault (secrets agents never read).",
   "author": {
     "name": "Team Helix AI",

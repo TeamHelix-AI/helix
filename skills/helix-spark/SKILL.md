@@ -23,18 +23,23 @@ those instead.
 
 ## Setup
 
-```
-HK() { ${CLAUDE_PLUGIN_ROOT}/bin/helix spark "$@"; }
-```
-
 Three verbs, never more:
 
+```sh
+# start server, open browser; auto-restarts stale servers on the same port
+${CLAUDE_PLUGIN_ROOT}/bin/helix spark up   --spark <slug> [--no-open]
+
+# card JSON on stdin -> {cardId, cursor}; existing id -> update
+${CLAUDE_PLUGIN_ROOT}/bin/helix spark push --spark <slug>
+
+# exit 0 delta, 3 timeout, 4 no-viewer, 5 down
+# --wake-on user returns only when a human acted
+${CLAUDE_PLUGIN_ROOT}/bin/helix spark wait --spark <slug> --since <cursor> [--timeout <s>] [--card <id>] [--wake-on user]
 ```
-HK up   --spark <slug> [--no-open]   # start server, open browser; auto-restarts stale servers on the same port
-HK push --spark <slug>               # card JSON on stdin -> {cardId, cursor}; existing id -> update
-HK wait --spark <slug> --since <cursor> [--timeout <s>] [--card <id>]
-                                     # exit 0 delta, 3 timeout, 4 no-viewer, 5 down
-```
+
+- `up` opens the browser itself, from inside the binary. `--no-open` is for
+  headless or scripted runs — never a way around a permission prompt. If a
+  prompt is declined, hand the user `! open <url>` and carry on.
 
 Sessions are **central**: data lives in `~/.helix/spark/<slug>/` — no
 project, no cwd, no `--dir`. Pick a short topic slug; `up` with the same
@@ -44,9 +49,10 @@ before riffing anew; the viewer shows its own resume digest, yours carries
 the substance. Snapshot: `curl -s http://127.0.0.1:<port>/api/state`
 (cards, responses, chat, cursor, `listening`, `lastEventAt`).
 
-Shell discipline (same as siblings): the CLI is wrapped in a shell
-function above because zsh does NOT word-split unquoted `$VARS` — a bare
-`$HK up` breaks; heredocs (`<<'EOF'`) for push payloads, never `echo`.
+Shell discipline (same as siblings): always call the binary by its full
+path — a shell variable or function holding it stops the skill's
+pre-approval from matching, and every call then prompts. Heredocs
+(`<<'EOF'`) for push payloads, never `echo`.
 
 ## What you push
 
@@ -117,7 +123,7 @@ says so, verdicts have landed on everything live — the viewer shows a
 
 ## Server operations
 
-- A stale server restarts on the same port when you run `$HK up` again.
+- A stale server restarts on the same port when you run `spark up` again.
   The event log survives restarts.
 - App render failures arrive in your delta as `client.error` — fix them.
 
@@ -131,23 +137,13 @@ listening; while none is, it shows away and warns on send.
 
 ```bash
 # LAST tool call of the turn — Bash with run_in_background: true
-HK() { ${CLAUDE_PLUGIN_ROOT}/bin/helix spark "$@"; }
-SINCE=<CURSOR>
-while true; do
-  OUT=$(HK wait --spark <SLUG> --since $SINCE --timeout 3600); CODE=$?
-  if [ $CODE -eq 0 ]; then
-    # hold through viewer churn — wake only for user events and render errors
-    V=$(printf '%s' "$OUT" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{try{const s=JSON.parse(d);const real=(s.events||[]).some(e=>e.origin==='user'||e.type==='client.error');console.log(real?'wake':('hold '+s.cursor))}catch{console.log('wake')}})")
-    case "$V" in
-      hold\ *) SINCE=${V#hold }; continue;;
-      *) printf '%s\n' "$OUT"; break;;             # user acted -> you wake with the delta
-    esac
-  fi
-  if [ $CODE -eq 5 ]; then printf '%s\n' "$OUT"; break; fi  # server down -> wake, restart on the SAME port, re-wait
-  if [ $CODE -eq 4 ]; then sleep 60; continue; fi           # tab closed -> hold; they may come back
-  if [ $CODE -ne 3 ]; then sleep 30; fi                     # unknown exit -> never hot-loop
-done                                                        # 3 = quiet hour -> keep holding
+${CLAUDE_PLUGIN_ROOT}/bin/helix spark wait --spark <slug> --since <cursor> --timeout 3600 --wake-on user
 ```
+
+`--wake-on user` holds through viewer churn and a closed tab, returning only
+when a human acted or the app hit a render error. Exit 0 wakes you with the
+delta; 5 means the server died — restart it on the same port and re-arm. 3 is
+a quiet hour, not an ending.
 
 Bake `<SLUG>` and the last drained `<CURSOR>` into the command — background
 calls share no shell state. Cursor discipline is the family rule: only use

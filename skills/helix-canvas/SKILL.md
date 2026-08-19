@@ -13,20 +13,23 @@ canvas is the surface; the terminal is the fallback channel.
 
 ## Setup
 
-The CLI lives in the Helix Canvas repo:
-
-```
-HX="${CLAUDE_PLUGIN_ROOT}/bin/helix canvas"
-```
-
 Three verbs, never more (ratified contract):
 
+```sh
+# start server, open browser; prints {url, port, cursor, viewers}
+${CLAUDE_PLUGIN_ROOT}/bin/helix canvas up   --canvas <slug> [--no-open]
+
+# card JSON on stdin -> {cardId, cursor}; existing id -> update
+${CLAUDE_PLUGIN_ROOT}/bin/helix canvas push --canvas <slug>
+
+# blocks; exit 0 delta, 3 timeout, 4 no-viewer, 5 server down
+# --wake-on user returns only when a human acted (see Draining)
+${CLAUDE_PLUGIN_ROOT}/bin/helix canvas wait --canvas <slug> --since <cursor> [--timeout <s>] [--wake-on user]
 ```
-$HX up   --canvas <slug> [--no-open]        # start server, open browser; prints {url, port, cursor, viewers}
-$HX push --canvas <slug>                    # card JSON on stdin -> {cardId, cursor}; existing id -> update
-$HX wait --canvas <slug> --since <cursor> [--timeout <s>]
-                                            # blocks; exit 0 delta, 3 timeout, 4 no-viewer, 5 server down
-```
+
+- `up` opens the browser itself, from inside the binary. `--no-open` is for
+  headless or scripted runs — never a way around a permission prompt. If a
+  prompt is declined, hand the user `! open <url>` and carry on.
 
 Canvas data lives in `~/.helix/canvas/<project>/<slug>/` (SQLite event log,
 `server.json` with port/pid, uploads) — one home for the whole machine, never
@@ -39,7 +42,7 @@ streams changes to the browser.
    `~/.helix/canvas/<project>/` if unsure). Never guess. Canvases are
    per-project by scope: the cwd names the project; pass `--dir` to target
    another one.
-2. `$HX up --canvas <slug>` — reuses a live server or starts one.
+2. `${CLAUDE_PLUGIN_ROOT}/bin/helix canvas up --canvas <slug>` — reuses a live server or starts one.
 3. **Blank canvas** (no topic given): the app shows a centered chat-style
    prompt. Just `up` and `wait` — the user's opening prompt arrives as a
    `prompt` card in the delta; begin from it.
@@ -109,28 +112,28 @@ Two symmetric failure modes, both real:
   instantly if the log already holds them. When waiting generally, first
   inspect the `/api/state` snapshot for answers you haven't processed.
 
-Stop signals for a general drain loop: user `response.added` (kind ≠
-reaction), user `card.created`, **user `card.updated`** (gate ticks, board
-moves, lane toggles), and `client.error`. Forgetting `card.updated` means
-sitting through answered gates.
+What counts as a human acting — and so what `--wake-on user` returns on —
+is user `response.added` (kind ≠ reaction), user `card.created`, user
+`card.updated` (gate ticks, board moves, lane toggles), and `client.error`.
+`card.updated` is in there deliberately: without it you would sit through
+answered gates.
 
 During an active round, drain in the foreground (one Bash call holds ≤9 min):
 
 ```bash
-CURSOR=$(curl -s http://127.0.0.1:$PORT/api/state | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).cursor))")
-for i in $(seq 1 12); do
-  OUT=$($HX wait --canvas $SLUG --since $CURSOR --timeout 45); CODE=$?
-  # break on: user response.added (kind != reaction), user card.created, client.error
-  # otherwise update CURSOR from $OUT and continue
-  if [ $CODE -eq 4 ]; then break; fi   # no-viewer -> the endless wait below covers it
-  if [ $CODE -eq 5 ]; then break; fi   # server down -> restart on the SAME port
-done
+${CLAUDE_PLUGIN_ROOT}/bin/helix canvas wait --canvas <slug> --since <cursor> --timeout 540 --wake-on user
 ```
+
+`--wake-on user` does the holding: viewer churn, your own cards and reactions
+advance the cursor inside the call, and it returns only when a human actually
+acted. Exit 0 delta on stdout, 3 quiet, 5 server down — restart on the same
+port. Bake the slug and cursor in as literal values; the cursor is the one
+`up` printed, or the one your last wait returned.
 
 - Use `printf '%s'` when piping JSON in shell — **zsh `echo` mangles `\n`**.
 - Heredocs (`<<'EOF'`) for push payloads, never `echo`.
-- zsh does **not** word-split unquoted `$VARS` — wrap the CLI in a shell
-  function (`hx() { ${CLAUDE_PLUGIN_ROOT}/bin/helix canvas "$@"; }`), not a string variable.
+- Call the binary by its full path — a shell variable or function holding
+  it stops the skill's pre-approval from matching, and every call prompts.
 - `client.error` events in the delta are app-side render failures — fix
   them; don't wait for the user to report.
 
@@ -145,22 +148,21 @@ with the delta on stdout; drain, respond, and end the turn the same way.
 
 ```bash
 # LAST tool call of the turn — Bash with run_in_background: true
-HX="${CLAUDE_PLUGIN_ROOT}/bin/helix canvas"
-while true; do
-  OUT=$($HX wait --canvas $SLUG --since $CURSOR --timeout 3600); CODE=$?
-  if [ $CODE -eq 0 ]; then printf '%s\n' "$OUT"; break; fi  # user acted -> you wake with the delta
-  if [ $CODE -eq 5 ]; then printf '%s\n' "$OUT"; break; fi  # server down -> wake, restart on the SAME port, re-wait
-  if [ $CODE -eq 4 ]; then sleep 60; fi                     # tab closed -> hold; they may come back
-done                                                        # 3 = quiet hour -> keep holding
+${CLAUDE_PLUGIN_ROOT}/bin/helix canvas wait --canvas <slug> --since <cursor> --timeout 3600 --wake-on user
 ```
+
+Exit 0 wakes you with the delta; 5 means the server died — restart it on the
+same port and re-arm. 3 is a quiet hour, not an ending: re-arm and carry on.
 
 Rules:
 
 - Timeouts and retry counts bound a *foreground drain*, never the session.
   Quiet ≠ over. No-viewer ≠ over (the user reopens the tab and expects you
   live).
-- `$SLUG` and `$CURSOR` must be baked into the command (background calls
-  share no shell state); `$CURSOR` is the cursor from your **last drain**.
+- The slug and cursor must be baked in as literal values (background calls
+  share no shell state, and a shell variable stops this skill's
+  pre-approval from matching); the cursor is the one from your **last
+  drain**.
 - The session ends only explicitly: the user says they're done (terminal
   or canvas), or ratifies a closing decision. Only then do the End-of-
   session steps and stop re-arming the wait.
@@ -230,7 +232,7 @@ every artifact card `done`; announce it and update the session's memory.
 
 ## Server operations
 
-- A stale server restarts on the same port when you run `$HX up` again;
+- A stale server restarts on the same port when you run `${CLAUDE_PLUGIN_ROOT}/bin/helix canvas up` again;
   open tabs reconnect. Manual equivalent: kill the pid in `server.json`,
   relaunch with `--port <same port>`.
 - The event log survives restarts; state is never in memory only.

@@ -13,15 +13,20 @@ never bypass a gate.
 
 ## Setup
 
-```
-HL="${CLAUDE_PLUGIN_ROOT}/bin/helix loop"
+```sh
+# start server + board; auto-restarts stale servers on the same port
+${CLAUDE_PLUGIN_ROOT}/bin/helix loop up   --loop <slug> [--dir <projectDir>] [--no-open]
+
+# loop EVENT JSON (single or array) on stdin
+${CLAUDE_PLUGIN_ROOT}/bin/helix loop push --loop <slug>
+
+# blocks for events; exit 3 timeout, 4 no-viewer, 5 down
+${CLAUDE_PLUGIN_ROOT}/bin/helix loop wait --loop <slug> --since <cursor> [--timeout <s>]
 ```
 
-```
-$HL up   --loop <slug> [--dir <projectDir>] [--no-open]   # start server + board; auto-restarts stale servers on the same port
-$HL push --loop <slug>                                     # loop EVENT JSON (single or array) on stdin
-$HL wait --loop <slug> --since <cursor> [--timeout <s>]    # blocks for events; exit 3 timeout, 4 no-viewer, 5 down
-```
+- `up` opens the browser itself, from inside the binary. `--no-open` is for
+  headless or scripted runs — never a way around a permission prompt. If a
+  prompt is declined, hand the user `! open <url>` and carry on.
 
 Data: `~/.helix/loop/<project>/<slug>/` (event log + server.json) — one home
 for the whole machine, never inside a repo. The board

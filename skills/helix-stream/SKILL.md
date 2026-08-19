@@ -15,18 +15,23 @@ bar.**
 
 ## Setup
 
-```
-HS="${CLAUDE_PLUGIN_ROOT}/bin/helix stream"
-```
-
 Three verbs, never more:
 
+```sh
+# start server, open browser; auto-restarts stale servers on the same port
+${CLAUDE_PLUGIN_ROOT}/bin/helix stream up   --stream <slug> [--dir <projectDir>] [--no-open]
+
+# card JSON on stdin -> {cardId, cursor}; existing id -> update
+${CLAUDE_PLUGIN_ROOT}/bin/helix stream push --stream <slug> [--dir]
+
+# exit 0 delta, 3 timeout, 4 no-viewer, 5 down
+# --wake-on user returns only when a human acted
+${CLAUDE_PLUGIN_ROOT}/bin/helix stream wait --stream <slug> --since <cursor> [--timeout <s>] [--card <id>] [--dir] [--wake-on user]
 ```
-$HS up   --stream <slug> [--dir <projectDir>] [--no-open]  # start server, open browser; auto-restarts stale servers on the same port
-$HS push --stream <slug> [--dir]                            # card JSON on stdin -> {cardId, cursor}; existing id -> update
-$HS wait --stream <slug> --since <cursor> [--timeout <s>] [--card <id>] [--dir]
-                                                            # exit 0 delta, 3 timeout, 4 no-viewer, 5 down
-```
+
+- `up` opens the browser itself, from inside the binary. `--no-open` is for
+  headless or scripted runs — never a way around a permission prompt. If a
+  prompt is declined, hand the user `! open <url>` and carry on.
 
 Data: `~/.helix/stream/<project>/<slug>/` (SQLite event log + `server.json`)
 — one home for the whole machine, never inside a repo.
@@ -35,9 +40,10 @@ session (e.g. the task's short name). **Always pass `--dir`** with the
 project root in scripts/background sessions (cwd is not reliable).
 Snapshot: `curl -s http://127.0.0.1:<port>/api/state`.
 
-Shell discipline (same as siblings): wrap the CLI in a shell function —
-zsh does NOT word-split unquoted `$VARS`; heredocs (`<<'EOF'`) for push
-payloads, never `echo`.
+Shell discipline (same as siblings): always call the binary by its full
+path — a shell variable or function holding it stops the skill's
+pre-approval from matching, and every call then prompts. Heredocs
+(`<<'EOF'`) for push payloads, never `echo`.
 
 ## What you push
 
@@ -118,7 +124,7 @@ is needed, say so and suggest switching.
 
 ## Server operations
 
-- A stale server restarts on the same port when you run `$HS up` again.
+- A stale server restarts on the same port when you run `${CLAUDE_PLUGIN_ROOT}/bin/helix stream up` again.
   The event log survives restarts.
 - App render failures arrive in your delta as `client.error` — fix them.
 
@@ -137,14 +143,12 @@ is needed, say so and suggest switching.
 
 ```bash
 # LAST tool call of the turn — Bash with run_in_background: true
-HS="${CLAUDE_PLUGIN_ROOT}/bin/helix stream"
-while true; do
-  OUT=$($HS wait --stream $SLUG --dir $PROJECT --since $CURSOR --timeout 3600); CODE=$?
-  if [ $CODE -eq 0 ]; then printf '%s\n' "$OUT"; break; fi  # user acted -> you wake with the delta
-  if [ $CODE -eq 5 ]; then printf '%s\n' "$OUT"; break; fi  # server down -> wake, restart on the SAME port, re-wait
-  if [ $CODE -eq 4 ]; then sleep 60; fi                     # no viewer -> hold; they may come back
-done                                                        # 3 = quiet hour -> keep holding
+${CLAUDE_PLUGIN_ROOT}/bin/helix stream wait --stream <slug> --dir <projectDir> --since <cursor> --timeout 3600 --wake-on user
 ```
+
+`--wake-on user` holds through viewer churn and a closed tab, returning only
+when a human acted. Exit 0 wakes you with the delta; 5 means the server died —
+restart it on the same port and re-arm. 3 is a quiet hour, not an ending.
 
    Bake `$SLUG`, `$PROJECT`, and the last drained `$CURSOR` into the
    command — background calls share no shell state. The session ends only
