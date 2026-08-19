@@ -17,7 +17,7 @@ Three verbs, never more (ratified contract):
 
 ```sh
 # start server, open browser; prints {url, port, cursor, viewers}
-${CLAUDE_PLUGIN_ROOT}/bin/helix canvas up   --canvas <slug> [--no-open]
+${CLAUDE_PLUGIN_ROOT}/bin/helix canvas up   --canvas <slug> [--no-open] [--brief "<the job>"]
 
 # card JSON on stdin -> {cardId, cursor}; existing id -> update
 ${CLAUDE_PLUGIN_ROOT}/bin/helix canvas push --canvas <slug>
@@ -42,10 +42,15 @@ streams changes to the browser.
    `~/.helix/canvas/<project>/` if unsure). Never guess. Canvases are
    per-project by scope: the cwd names the project; pass `--dir` to target
    another one.
-2. `${CLAUDE_PLUGIN_ROOT}/bin/helix canvas up --canvas <slug>` — reuses a live server or starts one.
-3. **Blank canvas** (no topic given): the app shows a centered chat-style
-   prompt. Just `up` and `wait` — the user's opening prompt arrives as a
-   `prompt` card in the delta; begin from it.
+2. `${CLAUDE_PLUGIN_ROOT}/bin/helix canvas up --canvas <slug> --brief "<the job, in your words>"`
+   — reuses a live server or starts one. **Pass `--brief` whenever the user
+   has already told you what this is about.** An empty board with a brief
+   opens working, that line under the mark; without one it asks *What are we
+   working on?* — which reads, to someone who just told you, as though you
+   did not hear them. The brief is also your first status pill.
+3. **Blank canvas** (no topic given): bare `up`, no `--brief`. The app shows
+   the centered prompt; `up` and `wait`, and the user's opening prompt
+   arrives as a `prompt` card in the delta — begin from it.
 4. On resume, fetch state first:
    `curl -s http://127.0.0.1:<port>/api/state` — cards, responses, cursor.
    Summarize open items to the user before pushing anything.
@@ -54,9 +59,9 @@ streams changes to the browser.
 6. Between rounds, **drain the delta continuously** — react to every user
    note/comment within one cycle, even mid-build ("built", "on it", or a
    thread reply). Never let user input sit unacknowledged.
-7. **Keep the status pill honest**: push
-   `{"type":"status","payload":{"text":"…"}}` when starting a chunk of
-   work, when going idle, and at hand-offs — it renders bottom-left and is
+7. **Keep the status pill honest**: `--brief` sets the first one; after
+   that push `{"type":"status","payload":{"text":"…"}}` when starting a
+   chunk of work, when going idle, and at hand-offs — it renders bottom-left and is
    how the user knows you're alive mid-build.
 8. Fold ratified decisions into the session's doc/memory as usual.
 
@@ -75,8 +80,8 @@ streams changes to the browser.
 **Pick the right gate.** A user-owned checklist is for hand-offs where
 **every item is genuinely required** — the session (and Fleet's attention
 queue) treats the card as pending until all items are done. A confirmation
-or sign-off is **not a checklist**: push a `decision` card (Ratify/Decline —
-Decline already spawns its "why?" question per the rejection protocol), or
+or sign-off is **not a checklist**: push a `decision` card (Ratify/Decline — a
+Decline is what spawns the "why?" question, per the rejection protocol), or
 `options` when there are real alternatives. Never pad a checklist with
 filler items like "one more thing (leave a note)" — notes are always
 possible via the card's thread, and an untickable item keeps the session
@@ -171,8 +176,11 @@ Rules:
 
 ## The rejection protocol (ratified — never violate)
 
-1. A **Decline on a decision card spawns its linked "why" question in the
-   same push** (edge labeled `declined — why?`). Never minutes later.
+1. The **"why" question exists only once a Decline has landed**. It goes out
+   in the same push as your reaction to that verdict, edged
+   `declined — why?` from the decision — never minutes later. Pushing it
+   alongside the decision card, before any verdict, is a violation: it asks
+   the user why they declined something they have not decided yet.
 2. Answered decision cards are **spent**. Re-deciding = push a *retake*
    decision, edge `superseded by` from the old one. Never edit a verdict.
 3. While building, drain and acknowledge between edits.
