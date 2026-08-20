@@ -1,90 +1,136 @@
 # Team Helix
 
-Visual surfaces for working with Claude Code agents, plus the shared store and
-secret broker beneath them. Everything runs on your machine.
+Helix gives Claude Code a set of surfaces designed for different kinds of work.
 
-```
+Some jobs start with a conversation. Others need a whiteboard, parallel workers, structured reviews or a live dashboard. Helix chooses the right surface and provides the shared memory, secret handling and infrastructure behind it.
+
+Everything runs on your machine.
+
+```bash
 /plugin marketplace add TeamHelix-AI/helix
 /plugin install helix@team-helix
 ```
 
-Then `/helix:helix-start` in any project, and Helix picks the surface the job
-deserves.
+Start with:
 
-## The surfaces
+```text
+/helix:helix-start
+```
 
-| | | |
-|---|---|---|
-| **Start** | Routing | Describe the job; Helix picks the surface it deserves, or none at all. |
-| **Spark** | Diverging | A chat feed and a shelf of living idea cards. Riff, then harvest the survivors. |
-| **Canvas** | Deciding | Cards on a canvas — questions, options, decisions, diagrams. You answer in the browser. |
-| **Loop** | Building | A human-gated gauntlet. Builders and critics iterate against a bar you ratified. |
-| **Arena** | Judging | One question, N candidates, one judge scoring against a rubric you ratified. The winner becomes the base; the best of the losers is grafted in. |
-| **Swarm** | Sweeping | One job cut into disjoint slices, one worker each. Every worker says how much it actually read; the merged report names its own gaps. |
-| **Stream** | Watching | A dashboard for autonomous work. Watch, steer, hold the brake. |
-| **Archive** | Remembering | A session's story — chapters, decisions, findings, artefacts — written once, read-only, kept. |
-| **Fleet** | Mission control | Every session across every project on one board, with a "needs you" queue. |
+Describe what you want to do and Helix will choose the right surface.
 
-## The infrastructure
+If you already know where you're going, you can open any surface directly.
 
-| | | |
-|---|---|---|
-| **Memory** | What we know | One file, one fact. Distilled knowledge, recalled under every session. Advice, never enforcement. |
-| **Vault** | Secrets | Agents reference credentials by name and never read them. A value enters one command's environment and nowhere else. |
-| **Rails** | What binds | Rules, standards, playbooks, checklists, safeguards. Humans author, agents propose; every skill reads the rails in scope first. Optional Claude Code hooks make refusals real. |
-| **Shelf** | What is kept | Finished artefacts with a title, a description and their context, immutable and addressed by id from any later session. |
+---
 
-## Commands
+# Surfaces
 
-| | |
-|---|---|
-| `/helix:helix-start` | Route a job to a surface |
-| `/helix:helix-spark` | Open a spark |
-| `/helix:helix-canvas` | Open a canvas |
-| `/helix:helix-loop` | Run a loop |
-| `/helix:helix-arena` | Run an arena |
-| `/helix:helix-swarm` | Run a swarm |
-| `/helix:helix-stream` | Open a stream |
-| `/helix:helix-archive` | Archive this session |
+| Surface | Purpose | Description |
+|----------|---------|-------------|
+| **Start** | Entry point | Describe the work. Helix chooses the right surface or simply gets started. |
+| **Spark** | Explore | Brainstorm with your agents. Good ideas become cards that you can keep, combine or discard. |
+| **Canvas** | Decide | A shared board for questions, options, diagrams and decisions. |
+| **Loop** | Build | Agents build, review and improve their work in rounds. You decide when it's ready to continue. |
+| **Arena** | Compare | Generate several solutions, score them against your criteria and combine the strongest ideas into one result. |
+| **Swarm** | Parallelise | Split a large job into independent pieces and let multiple agents work at the same time. The final report shows what was covered and where the gaps are. |
+| **Stream** | Monitor | Watch agents work in real time. Pause them, redirect them or step in whenever you want. |
+| **Archive** | Remember | A permanent record of a session, including its decisions, findings and outputs. |
+| **Fleet** | Overview | See every active session across every project from one place, including the work waiting for your attention. |
+
+---
+
+# Shared infrastructure
+
+These services are available from every surface.
+
+| Component | Purpose | Description |
+|-----------|---------|-------------|
+| **Memory** | Long-term knowledge | Store facts once and reuse them across sessions. Memory suggests. It never overrides. |
+| **Vault** | Secrets | Store credentials securely. Agents can use them without ever seeing the secret itself. |
+| **Rails** | Team standards | Rules, playbooks, coding standards and checklists shared across your projects. Humans write them. Agents follow them. |
+| **Shelf** | Shared artefacts | Save finished work together with its context so it can be found and reused later. |
+
+---
+
+# Commands
+
+Every surface can be opened directly.
+
+| Command | Description |
+|---------|-------------|
+| `/helix:helix-start` | Let Helix choose the right surface |
+| `/helix:helix-spark` | Open Spark |
+| `/helix:helix-canvas` | Open Canvas |
+| `/helix:helix-loop` | Open Loop |
+| `/helix:helix-arena` | Open Arena |
+| `/helix:helix-swarm` | Open Swarm |
+| `/helix:helix-stream` | Open Stream |
+| `/helix:helix-archive` | Archive the current session |
 | `/helix:helix-fleet` | Open Fleet |
-| `/helix:helix-memory` | Read or write Memory |
-| `/helix:helix-vault` | Use a credential through Vault |
-| `/helix:helix-rails` | Read, follow or propose Rails |
-| `/helix:helix-shelf` | Put an artefact on the Shelf, or take one down |
+| `/helix:helix-memory` | Read or update Memory |
+| `/helix:helix-vault` | Use a stored credential |
+| `/helix:helix-rails` | Read, follow or update Rails |
+| `/helix:helix-shelf` | Save or retrieve an artefact |
 
-## Requirements
+---
 
-macOS or Linux, on arm64 or amd64.
+# Requirements
 
-The first Helix command downloads the `helix` binary (~23 MB) from this
-repository's releases and caches it at `~/.helix/bin/`. The download is
-verified against `bin/checksums.txt`, which ships with the plugin — a
-mismatch refuses to run. Nothing else is installed.
+Helix supports:
 
-Vault creates a master key on first use, in the macOS keychain by default. On
-a machine where the keychain prompts, expect a dialog that first time.
+- macOS
+- Linux
+- arm64
+- amd64
 
-## Where things live
+The first time you run a Helix command, it downloads the `helix` binary (about 23 MB) into:
 
-One machine-wide home, never inside your repositories:
-
-```
-~/.helix/<app>/…      event logs, session state, memories, the vault, rails, the shelf
-~/.helix/bin/         the cached binary
+```text
+~/.helix/bin/
 ```
 
-`HELIX_HOME` moves all of it. `HELIX_BIN` points at a binary of your own.
+The download is verified against the bundled checksum before it runs.
 
-## Updating
+Nothing else is installed.
 
+The first time you use Vault, it creates a master key. On macOS the key is stored in the Keychain, so you may be asked to grant access once.
+
+---
+
+# Storage
+
+Helix stores everything outside your repositories.
+
+```text
+~/.helix/
+├── bin/
+├── memory/
+├── vault/
+├── rails/
+├── shelf/
+├── sessions/
+└── logs/
 ```
+
+Set `HELIX_HOME` to move the entire directory.
+
+Set `HELIX_BIN` to use your own Helix binary.
+
+---
+
+# Updating
+
+```bash
 /plugin marketplace update team-helix
 /plugin update helix@team-helix
 ```
 
-A new plugin version fetches its matching binary on the next command.
+The next time you run a Helix command, the matching binary is downloaded automatically.
 
 ---
 
-Apache 2.0. Published from the Team Helix source repository; issues and
-discussion here.
+## License
+
+Apache 2.0.
+
+Published from the Team Helix repository. Issues, discussions and contributions are welcome.
