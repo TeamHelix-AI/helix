@@ -27,10 +27,12 @@ Three verbs, never more:
 
 ```sh
 # start server, open browser; auto-restarts stale servers on the same port
-${CLAUDE_PLUGIN_ROOT}/bin/helix spark up   --spark <slug> [--no-open]
+${CLAUDE_PLUGIN_ROOT}/bin/helix spark up   --spark <slug> --agent <name> --model <model-id> [--no-open]
+#   --agent: your product name, lowercase (claude, codex, …)
+#   --model: your exact model id (e.g. claude-fable-5) — Fleet shows and filters by these
 
 # card JSON on stdin -> {cardId, cursor}; existing id -> update
-${CLAUDE_PLUGIN_ROOT}/bin/helix spark push --spark <slug>
+${CLAUDE_PLUGIN_ROOT}/bin/helix spark push --spark <slug>   # card JSON (one object, or an array of them) on stdin
 
 # exit 0 delta, 3 timeout, 4 no-viewer, 5 down
 # --wake-on user returns only when a human acted
@@ -53,6 +55,18 @@ Shell discipline (same as siblings): always call the binary by its full
 path — a shell variable or function holding it stops the skill's
 pre-approval from matching, and every call then prompts. Heredocs
 (`<<'EOF'`) for push payloads, never `echo`.
+
+## Rails first
+
+Before proposing anything, read the rails that bind this project on this surface:
+
+```sh
+${CLAUDE_PLUGIN_ROOT}/bin/helix rails for --surface spark
+```
+
+What comes back is not advice — it is the standard the work is held to. Cite
+rail ids when you act on them; full text with `helix rails get <id>`. Details
+in the helix-rails skill.
 
 ## What you push
 
@@ -126,6 +140,10 @@ says so, verdicts have landed on everything live — the viewer shows a
 - A stale server restarts on the same port when you run `spark up` again.
   The event log survives restarts.
 - App render failures arrive in your delta as `client.error` — fix them.
+- **Kill by pid, never by name.** `pkill -f "helix spark serve"` matches every
+  spark server on the machine — other projects, other people's sessions, runs
+  in the middle of their work. It looks local and is not. Read the pid instead:
+  `kill "$(sed -n 's/.*"pid": *\([0-9]*\).*/\1/p' ~/.helix/spark/<slug>/server.json)"`.
 
 ## Never end a turn without a wait running (ratified, family-wide)
 

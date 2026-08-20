@@ -8,17 +8,21 @@ secret broker beneath them. Everything runs on your machine.
 /plugin install helix@team-helix
 ```
 
-Then `/helix:start` in any project, and Helix picks the surface the job
+Then `/helix:helix-start` in any project, and Helix picks the surface the job
 deserves.
 
 ## The surfaces
 
 | | | |
 |---|---|---|
+| **Start** | Routing | Describe the job; Helix picks the surface it deserves, or none at all. |
 | **Spark** | Diverging | A chat feed and a shelf of living idea cards. Riff, then harvest the survivors. |
 | **Canvas** | Deciding | Cards on a canvas — questions, options, decisions, diagrams. You answer in the browser. |
 | **Loop** | Building | A human-gated gauntlet. Builders and critics iterate against a bar you ratified. |
+| **Arena** | Judging | One question, N candidates, one judge scoring against a rubric you ratified. The winner becomes the base; the best of the losers is grafted in. |
+| **Swarm** | Sweeping | One job cut into disjoint slices, one worker each. Every worker says how much it actually read; the merged report names its own gaps. |
 | **Stream** | Watching | A dashboard for autonomous work. Watch, steer, hold the brake. |
+| **Archive** | Remembering | A session's story — chapters, decisions, findings, artefacts — written once, read-only, kept. |
 | **Fleet** | Mission control | Every session across every project on one board, with a "needs you" queue. |
 
 ## The infrastructure
@@ -27,6 +31,26 @@ deserves.
 |---|---|---|
 | **Memory** | What we know | One file, one fact. Distilled knowledge, recalled under every session. Advice, never enforcement. |
 | **Vault** | Secrets | Agents reference credentials by name and never read them. A value enters one command's environment and nowhere else. |
+| **Rails** | What binds | Rules, standards, playbooks, checklists, safeguards. Humans author, agents propose; every skill reads the rails in scope first. Optional Claude Code hooks make refusals real. |
+| **Shelf** | What is kept | Finished artefacts with a title, a description and their context, immutable and addressed by id from any later session. |
+
+## Commands
+
+| | |
+|---|---|
+| `/helix:helix-start` | Route a job to a surface |
+| `/helix:helix-spark` | Open a spark |
+| `/helix:helix-canvas` | Open a canvas |
+| `/helix:helix-loop` | Run a loop |
+| `/helix:helix-arena` | Run an arena |
+| `/helix:helix-swarm` | Run a swarm |
+| `/helix:helix-stream` | Open a stream |
+| `/helix:helix-archive` | Archive this session |
+| `/helix:helix-fleet` | Open Fleet |
+| `/helix:helix-memory` | Read or write Memory |
+| `/helix:helix-vault` | Use a credential through Vault |
+| `/helix:helix-rails` | Read, follow or propose Rails |
+| `/helix:helix-shelf` | Put an artefact on the Shelf, or take one down |
 
 ## Requirements
 
@@ -45,7 +69,7 @@ a machine where the keychain prompts, expect a dialog that first time.
 One machine-wide home, never inside your repositories:
 
 ```
-~/.helix/<app>/…      event logs, session state, memories, the vault
+~/.helix/<app>/…      event logs, session state, memories, the vault, rails, the shelf
 ~/.helix/bin/         the cached binary
 ```
 

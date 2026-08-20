@@ -15,13 +15,19 @@ never bypass a gate.
 
 ```sh
 # start server + board; auto-restarts stale servers on the same port
-${CLAUDE_PLUGIN_ROOT}/bin/helix loop up   --loop <slug> [--dir <projectDir>] [--no-open]
+${CLAUDE_PLUGIN_ROOT}/bin/helix loop up   --loop <slug> --agent <name> --model <model-id> [--dir <projectDir>] [--no-open]
+#   --agent: your product name, lowercase (claude, codex, …)
+#   --model: your exact model id (e.g. claude-fable-5) — Fleet shows and filters by these
 
-# loop EVENT JSON (single or array) on stdin
+# the bar: plan JSON {changed, reason, sections} on stdin -> a revision awaiting Ratify
+${CLAUDE_PLUGIN_ROOT}/bin/helix loop plan --loop <slug>
+
+# loop EVENT JSON (single or array) on stdin; exit 6 = the bar is not ratified yet
 ${CLAUDE_PLUGIN_ROOT}/bin/helix loop push --loop <slug>
 
 # blocks for events; exit 3 timeout, 4 no-viewer, 5 down
-${CLAUDE_PLUGIN_ROOT}/bin/helix loop wait --loop <slug> --since <cursor> [--timeout <s>]
+# --wake-on user holds through your own pushes and viewer churn and returns on a human act
+${CLAUDE_PLUGIN_ROOT}/bin/helix loop wait --loop <slug> --since <cursor> [--timeout <s>] [--wake-on user]
 ```
 
 - `up` opens the browser itself, from inside the binary. `--no-open` is for
@@ -33,13 +39,27 @@ for the whole machine, never inside a repo. The board
 is NOT a canvas — it is Helix Loop's own UI: bar pinned top, a lane per
 piece (click for attempt history), budget meter, gate banners, agent row.
 
+## Rails first
+
+Before proposing anything, read the rails that bind this project on this surface:
+
+```sh
+${CLAUDE_PLUGIN_ROOT}/bin/helix rails for --surface loop
+```
+
+What comes back is not advice — it is the standard the work is held to. Cite
+rail ids when you act on them; full text with `helix rails get <id>`. Details
+in the helix-rails skill.
+
 ## Event vocabulary (what you push)
 
+Every event on stdin is `{"type": "<name>", "payload": {…}}` — one object
+or an array of them. The fields listed below are the payload.
+
 ```
-loop.init        {name, budget:{maxAttemptsPerPiece, maxTokens}}
+loop.init        {name, budget:{maxAttemptsPerPiece, maxTokens}}   # defaults only; the plan's budget section is what counts
 audit            {agent, pieceId?, kind:"text"|"code"|"screenshot", text?, code?, language?, path?, label?}
 metrics          {agent?, pieceId?, model?, tokens?, toolCalls?, durationS?}   # cumulative deltas; feeds the Stats tab
-bar.proposed     {version, criteria:[{id, label, detail?, checks?:[string], evidence?}]}
 piece.created    {pieceId, title, deps?:[pieceId]}      # re-push merges (updates title/deps, keeps attempts)
 attempt.started  {pieceId, n, agent}
 attempt.finished {pieceId, n, agent, summary?}
@@ -50,13 +70,41 @@ gate.raised      {gateId, kind:"budget", detail}
 agent.status     {agent, text, pieceId?}                # include pieceId whenever the work is piece-scoped — it feeds the piece drawer's activity
 ```
 
+**The server refuses every work event until the bar is ratified** — pieces,
+attempts, verdicts, gates, evidence all come back `409 not-ratified` (exit 6).
+Only `loop.init`, `agent.status`, `metrics` and `budget.spent` land before.
+
+### The bar is the plan
+
+The bar goes through `helix loop plan`, never through `push`. It is the same
+plan every Helix run carries (Arena and Swarm use it too), in three sections:
+
+```
+criteria   {items:[{id, label, detail?, checks?:[string], evidence?}]}   # required
+budget     {maxTokens, maxAttemptsPerPiece}                                # defaults apply if absent, and the board says so
+models     {roles:{lead, builder, critic}, available?:[…]}                # every role inherits the session model if absent
+```
+
+```sh
+printf '%s' '{"changed":["criteria","budget","models"],
+  "reason":"pre-flight",
+  "sections":{"criteria":{"items":[…]},"budget":{"maxTokens":500000,"maxAttemptsPerPiece":5},"models":{"roles":{…}}}}' \
+  | ${CLAUDE_PLUGIN_ROOT}/bin/helix loop plan --loop <slug>
+```
+
+The person can **edit every section on the board** before ratifying — add,
+reword, reorder or remove criteria, change the budget, swap models. An edit
+supersedes your proposal and becomes the next revision, awaiting its own
+Ratify. So always run from the ratified revision's sections (`/api/state`
+`.plan.sections`), never from what you proposed.
+
 User actions arrive in your `wait` delta with `origin:"user"`:
-`bar.ratified`, `bar.declined`, `gate.resolved {action:"continue"|"stop"|"adjust"}`,
+`plan.ratified {revision}`, `plan.declined {revision, why}`, a user-origin
+`plan.proposed` (an edit — keep waiting), `gate.resolved {action:"continue"|"stop"|"adjust"}`,
 `note.added {text, pieceId?, critId?, bar?}` — `critId` targets one
-criterion, `bar: true` targets the whole bar (e.g. "add a criterion for
-X"). Bar/criterion notes are revision requests: answer them with the next
-`bar.proposed` version (never edit a ratified bar in place); a note
-arriving mid-run steers the next attempt or the next bar version.
+criterion, `bar: true` targets the whole bar. Bar notes are revision
+requests: answer them with the next `plan` revision (never edit a ratified
+bar in place); a note arriving mid-run steers the next attempt.
 
 ## The loop, step by step
 
@@ -69,23 +117,26 @@ arriving mid-run steers the next attempt or the next bar version.
    the critic must produce to claim a verdict). This matters most on heavy
    loops (app builds, code conversion, legacy modernization — where
    criteria carry non-functional requirements); only a trivial quick loop
-   may start label-only. The board renders definitions as popovers on the
-   criteria chips, marks undefined criteria dashed, and warns next to
-   Ratify — ratification means the human approved the *definitions*, so
-   proposing an under-defined bar on a serious loop is pushing the human
-   to sign a blank check. Push `bar.proposed`. **Do not start work.**
-3. **Wait for `bar.ratified`.** On `bar.declined`, ask why (terminal or a
-   note), revise, propose the next version. The bar NEVER changes without
-   a ratified new version — this is the anti-drift gate; there is no
+   may start label-only. The board lists the criteria, marks undefined
+   ones, and warns next to Ratify — ratification means the human approved
+   the *definitions*, so proposing an under-defined bar on a serious loop
+   is pushing the human to sign a blank check. Propose with
+   `helix loop plan` — criteria, budget and models in one revision.
+   **Do not start work**; the server will not let you anyway.
+3. **Wait for `plan.ratified`** with `wait … --wake-on user` (see *Cursor
+   discipline*), then read the ratified revision's sections and run from
+   those — the person may have edited them. On `plan.declined`, read the
+   why, revise, propose the next revision. The bar NEVER changes without
+   a ratified new revision — this is the anti-drift gate; there is no
    emergency exception. **Mid-run re-ratification** (the user asked for a
-   revision after work started): the moment the new version is ratified,
+   revision after work started): the moment the new revision is ratified,
    all future verdicts and the final integration judge against it.
    Pieces that already passed keep their pass — it is recorded against
-   the version they cleared — but the lead must review them against the
+   the revision they cleared — but the lead must review them against the
    changed criteria and explicitly reopen (new attempt) any piece a new
    or tightened criterion invalidates, saying so in `agent.status`.
    Never silently re-grade history, and never keep judging against a
-   superseded version.
+   superseded revision.
 4. **Split**: `piece.created` per independently judgeable piece — **as a
    DAG**: declare `deps` where one piece genuinely cannot be built or
    judged before another exists (design tokens before components, schema
@@ -155,7 +206,21 @@ arriving mid-run steers the next attempt or the next bar version.
    acknowledge it in `agent.status` and apply it to the next attempt.
 8. **Finish**: all pieces passed → assemble the final artifact, push a
    final `agent.status`, summarize in the terminal, update memory
-   (loop slug, port, bar version, budget spent, outcome).
+   (loop slug, port, plan revision, budget spent, outcome). A finished
+   loop's plan is a record: the board stops offering edits once every
+   piece has passed.
+
+## Server operations
+
+- A stale server restarts on the same port when you run `${CLAUDE_PLUGIN_ROOT}/bin/helix loop up`
+  again; open tabs reconnect.
+- **Kill by pid, never by name.** `pkill -f "helix loop serve"` matches every
+  loop server on the machine — other projects, other people's sessions, runs
+  in the middle of their work. It looks local and is not. Read the pid instead:
+  `kill "$(sed -n 's/.*"pid": *\([0-9]*\).*/\1/p' ~/.helix/loop/<project>/<slug>/server.json)"`.
+- The event log survives restarts; state is never in memory only. A server killed
+  under a live session is survivable — the session sees exit 5 and `up` brings it
+  back — but the work stops until someone notices.
 
 ## Cursor discipline (same law as helix-canvas)
 
@@ -163,6 +228,26 @@ Wait from the cursor of your last drain or a fresh `/api/state` fetch —
 and before waiting on something specific (a ratification, a gate), check
 `/api/state` first: the answer may already be in the log. Waiting-for-the-
 past and skipping-the-past are both real failure modes.
+
+When you wait **for a person** — `plan.ratified`, `gate.resolved` — always
+pass `--wake-on user`:
+
+```sh
+${CLAUDE_PLUGIN_ROOT}/bin/helix loop wait --loop <slug> --since <cursor> --timeout 600 --wake-on user
+```
+
+Without it the first delta of any origin returns — your own `piece.created`,
+a viewer opening the tab — and a lead that reads "not ratified yet" from
+such a delta and stops waiting has missed the ratification that comes next.
+Exit 3 means nothing yet: wait again from the returned cursor. Exit 5 means
+the server is down: `up`, then wait again. When draining steering between
+attempts, a short plain `wait` (60–120s) is right; it should return on
+anything.
+
+```sh
+PORT=$(sed -n 's/.*"port": *\([0-9]*\).*/\1/p' ~/.helix/loop/<project>/<slug>/server.json)
+curl -s "http://127.0.0.1:$PORT/api/state"   # .plan.status, .ready, .gates, .notes — check before you wait
+```
 
 ## Honesty rules
 

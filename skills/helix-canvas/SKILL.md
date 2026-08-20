@@ -1,6 +1,6 @@
 ---
 name: canvas
-description: Run a visual brainstorm/collaboration session on Helix Canvas — the local canvas app where Claude pushes cards (questions, options, decisions, diagrams, artifacts) and the user answers in the browser. Use when the user says "/helix-canvas", "visual brainstorm", "open a canvas", or wants to collaborate on the canvas instead of the terminal. The classic `brainstorm` skill stays untouched for terminal/doc sessions.
+description: Run a visual planning/brainstorm/collaboration session on Helix Canvas — the local canvas app where Claude pushes cards (questions, options, decisions, diagrams, artifacts) and the user answers in the browser. Use when the user says "/helix-canvas", "visual brainstorm", "open a canvas", or wants to collaborate on the canvas instead of the terminal. The classic `brainstorm` skill stays untouched for terminal/doc sessions.
 allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/bin/helix *)
 ---
 
@@ -17,10 +17,10 @@ Three verbs, never more (ratified contract):
 
 ```sh
 # start server, open browser; prints {url, port, cursor, viewers}
-${CLAUDE_PLUGIN_ROOT}/bin/helix canvas up   --canvas <slug> [--no-open] [--brief "<the job>"]
+${CLAUDE_PLUGIN_ROOT}/bin/helix canvas up   --canvas <slug> --agent <name> --model <model-id> [--no-open] [--brief "<the job>"]
 
 # card JSON on stdin -> {cardId, cursor}; existing id -> update
-${CLAUDE_PLUGIN_ROOT}/bin/helix canvas push --canvas <slug>
+${CLAUDE_PLUGIN_ROOT}/bin/helix canvas push --canvas <slug>   # card JSON (one object, or an array of them) on stdin
 
 # blocks; exit 0 delta, 3 timeout, 4 no-viewer, 5 server down
 # --wake-on user returns only when a human acted (see Draining)
@@ -30,11 +30,28 @@ ${CLAUDE_PLUGIN_ROOT}/bin/helix canvas wait --canvas <slug> --since <cursor> [--
 - `up` opens the browser itself, from inside the binary. `--no-open` is for
   headless or scripted runs — never a way around a permission prompt. If a
   prompt is declined, hand the user `! open <url>` and carry on.
+- **Identify yourself on `up` (ratified):** pass `--agent` with your product
+  name, lowercase (`claude`, `codex`, …) and `--model` with your exact model
+  id (e.g. `claude-fable-5`). Fleet shows and filters sessions by them; a
+  session that registers without them shows as anonymous. The session id is
+  picked up from the environment on its own.
 
 Canvas data lives in `~/.helix/canvas/<project>/<slug>/` (SQLite event log,
 `server.json` with port/pid, uploads) — one home for the whole machine, never
 inside a repo. The server watches files for `file-window`/`artifact` cards and
 streams changes to the browser.
+
+## Rails first
+
+Before proposing anything, read the rails that bind this project on this surface:
+
+```sh
+${CLAUDE_PLUGIN_ROOT}/bin/helix rails for --surface canvas
+```
+
+What comes back is not advice — it is the standard the work is held to. Cite
+rail ids when you act on them; full text with `helix rails get <id>`. Details
+in the helix-rails skill.
 
 ## Session flow
 
@@ -59,6 +76,10 @@ streams changes to the browser.
 6. Between rounds, **drain the delta continuously** — react to every user
    note/comment within one cycle, even mid-build ("built", "on it", or a
    thread reply). Never let user input sit unacknowledged.
+   **Notes that add work fold into the existing claude-owned todo** (push the
+   same card id with the new items), or into one "additional requirements"
+   list when they are genuinely a new track — never a new todo card per note;
+   a board with a list for every remark is unreadable.
 7. **Keep the status pill honest**: `--brief` sets the first one; after
    that push `{"type":"status","payload":{"text":"…"}}` when starting a
    chunk of work, when going idle, and at hand-offs — it renders bottom-left and is
@@ -67,7 +88,7 @@ streams changes to the browser.
 
 ## Ownership & gates (two-way cards)
 
-`todo`, `kanban`, and `gantt` carry an optional `payload.owner`:
+`todo`, `kanban`, `gantt`, and `prototype` carry an optional `payload.owner`:
 
 - **`claude`** (default) — a progress display; read-only for the user;
   update it as you work (push with the same `id`).
@@ -88,8 +109,16 @@ possible via the card's thread, and an untickable item keeps the session
 flagged in Fleet forever. An item that is truly optional gets
 `optional: true`; it stays clickable but never holds attention. When a gate
 has served its purpose, update it (all required items done) or `delete` it;
-user-owned kanban/gantt cards count as pending for as long as they exist,
-so hand them back (`owner: "claude"`) or delete them when the hand-off ends.
+user-owned gantt cards count as pending for as long as they exist, so hand
+them back (`owner: "claude"`) or delete them when the hand-off ends.
+
+**Ratified gates.** User-owned `kanban` and `prototype` cards close on an
+explicit **Ratify** button instead of board/dial state — the user decides
+when the arrangement or configuration is final. Ratifying freezes the card
+and answers it: the delta carries `response.added` with `kind: "ratify"`
+holding the final `columns` (kanban) or `values` (prototype). Gate on it
+with `wait --card <id>`, then read the response and apply the result. A
+claude-owned prototype is an **example** — playable, never pending.
 
 The dual gantt uses `payload.lanes: {claude: [tasks], user: [tasks]}` — one
 chart, two lanes, the user lane toggleable.
@@ -204,7 +233,7 @@ a raw-payload fallback, so new types may be pushed before renderers exist.
 | `mindmap` | `{tree:{label,children?[]}}` — interactive: balanced two-side layout, click nodes to fold/unfold (+N badge); `{mermaid}` also accepted |
 | `gantt` | `{sections:[{name,tasks:[{label,start,duration?\|end?,done?,active?}]}]}` or `{lanes:{claude,user}}` or `{mermaid}`; `owner?` |
 | `timeline` | `{entries:[{period, items:[…]}]}` or `{mermaid}` |
-| `kanban` | `{columns:[{id,title,cards:[{id,label}]}], owner?}` — user-owned = drag & drop |
+| `kanban` | `{columns:[{id,title,cards:[{id,label}]}], owner?}` — user-owned = drag & drop, pending until the user clicks Ratify (answers with `kind: "ratify"` + final `columns`) |
 | `todo` | `{items:[{id,label,state?:"pending"\|"active"\|"done",optional?}], owner?}` — `optional` items never hold attention |
 | `chart` | `{kind, labels?, datasets:[…], height?}` — kinds: line, area, bar, hbar, stacked-bar, scatter, bubble, pie, doughnut, polar, radar; palette is built-in and CVD-validated |
 | `metric` | `{tiles:[{label, value, unit?, delta?, tone?:"good"\|"bad"\|"neutral"}]}` — KPI tile row |
@@ -214,6 +243,7 @@ a raw-payload fallback, so new types may be pushed before renderers exist.
 | `gallery` | `{images:[{src\|path, caption?}]}` — first image is the hero |
 | `video` | `{src\|path, poster?}` — local files served with range support |
 | `html` | `{html, height?}` — sandboxed iframe, scripts allowed |
+| `prototype` | `{source, props?, values?, height?}` — live React prototype with a Dials tab. `source`: JSX module that default-exports one component; only `react` is importable; dial values arrive as props (theme tokens like `var(--card)`, `var(--ink)`, `var(--iris)` work in styles). `props` declares the dials, DialKit grammar: `n` (inferred slider), `[def,min,max,step?]`, `true/false` (toggle), `"#hex"` (color, 8-digit keeps alpha), `{type:"select",options}`, `{type:"text"}`, `{type:"action"}` (click count arrives as a prop under its name), nested object = folder (`_collapsed?`). The user tunes in the opened card's Dials tab; tuned `values` come back on the card via `card.updated`. `owner?`: `user` makes it a task — pending until the user clicks Ratify, which answers the card with `kind: "ratify"` + final `values`; default (`claude`) is an example, playable but never pending — read the ratified values and apply to the real code |
 | `file-window` | `{path}` — live view, line comments, md preview/raw |
 | `artifact` | `{path, status?:"forming"\|"stable"\|"done"}` — the deliverable; write the file with Write/Edit, the canvas streams it; modes preview/raw/meta + download |
 | `weave` | `{text?}` — renders this canvas's event log as the double helix; Claude's reflection card |
@@ -243,6 +273,10 @@ every artifact card `done`; announce it and update the session's memory.
 - A stale server restarts on the same port when you run `${CLAUDE_PLUGIN_ROOT}/bin/helix canvas up` again;
   open tabs reconnect. Manual equivalent: kill the pid in `server.json`,
   relaunch with `--port <same port>`.
+- **Kill by pid, never by name.** `pkill -f "helix canvas serve"` matches every
+  canvas server on the machine — other projects, other people's sessions, runs
+  in the middle of their work. It looks local and is not. Read the pid instead:
+  `kill "$(sed -n 's/.*"pid": *\([0-9]*\).*/\1/p' ~/.helix/canvas/<project>/<slug>/server.json)"`.
 - The event log survives restarts; state is never in memory only.
 
 ## What the app gives the user (so you can point them at it)

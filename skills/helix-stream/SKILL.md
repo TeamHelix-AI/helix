@@ -19,10 +19,12 @@ Three verbs, never more:
 
 ```sh
 # start server, open browser; auto-restarts stale servers on the same port
-${CLAUDE_PLUGIN_ROOT}/bin/helix stream up   --stream <slug> [--dir <projectDir>] [--no-open]
+${CLAUDE_PLUGIN_ROOT}/bin/helix stream up   --stream <slug> --agent <name> --model <model-id> [--dir <projectDir>] [--no-open]
+#   --agent: your product name, lowercase (claude, codex, …)
+#   --model: your exact model id (e.g. claude-fable-5) — Fleet shows and filters by these
 
 # card JSON on stdin -> {cardId, cursor}; existing id -> update
-${CLAUDE_PLUGIN_ROOT}/bin/helix stream push --stream <slug> [--dir]
+${CLAUDE_PLUGIN_ROOT}/bin/helix stream push --stream <slug> [--dir]   # card JSON (one object, or an array of them) on stdin
 
 # exit 0 delta, 3 timeout, 4 no-viewer, 5 down
 # --wake-on user returns only when a human acted
@@ -44,6 +46,18 @@ Shell discipline (same as siblings): always call the binary by its full
 path — a shell variable or function holding it stops the skill's
 pre-approval from matching, and every call then prompts. Heredocs
 (`<<'EOF'`) for push payloads, never `echo`.
+
+## Rails first
+
+Before proposing anything, read the rails that bind this project on this surface:
+
+```sh
+${CLAUDE_PLUGIN_ROOT}/bin/helix rails for --surface stream
+```
+
+What comes back is not advice — it is the standard the work is held to. Cite
+rail ids when you act on them; full text with `helix rails get <id>`. Details
+in the helix-rails skill.
 
 ## What you push
 
@@ -127,6 +141,10 @@ is needed, say so and suggest switching.
 - A stale server restarts on the same port when you run `${CLAUDE_PLUGIN_ROOT}/bin/helix stream up` again.
   The event log survives restarts.
 - App render failures arrive in your delta as `client.error` — fix them.
+- **Kill by pid, never by name.** `pkill -f "helix stream serve"` matches every
+  stream server on the machine — other projects, other people's sessions, runs
+  in the middle of their work. It looks local and is not. Read the pid instead:
+  `kill "$(sed -n 's/.*"pid": *\([0-9]*\).*/\1/p' ~/.helix/stream/<project>/<slug>/server.json)"`.
 
 ## End of session — linger, don't vanish
 

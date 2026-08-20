@@ -4,12 +4,12 @@
     "name": "Team Helix AI",
     "url": "https://github.com/TeamHelix-AI"
   },
-  "description": "Team Helix — visual surfaces for working with Claude Code agents, and the shared store and secret broker beneath them",
+  "description": "Team Helix — visual surfaces for working with Claude Code agents, and the shared store, secret broker, rules and shelf beneath them",
   "plugins": [
     {
       "name": "helix",
       "source": "./",
-      "description": "Spark, Canvas, Loop, Stream and Fleet — visual surfaces for working with Claude Code agents — plus Memory and Vault, the shared store and secret broker beneath them.",
+      "description": "Spark, Canvas, Loop, Arena, Swarm, Stream, Archive and Fleet — visual surfaces for working with Claude Code agents — plus Memory, Vault, Rails and Shelf — the shared store, secret broker, binding rules and kept artefacts beneath them.",
       "category": "productivity"
     }
   ]
