@@ -42,6 +42,10 @@ ${CLAUDE_PLUGIN_ROOT}/bin/helix spark wait --spark <slug> --since <cursor> [--ti
 - `up` opens the browser itself, from inside the binary. `--no-open` is for
   headless or scripted runs — never a way around a permission prompt. If a
   prompt is declined, hand the user `! open <url>` and carry on.
+- `up` also brings up Fleet (mission control) when it is down, and returns
+  `fleet: {url, started}`. Hand the user both links in one line —
+  `Board: <url> · Fleet: <fleet.url>` — so they know the overview is there.
+  `up` never opens Fleet in the browser; the user follows the link.
 
 Sessions are **central**: data lives in `~/.helix/spark/<slug>/` — no
 project, no cwd, no `--dir`. Pick a short topic slug; `up` with the same

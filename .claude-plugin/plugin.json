@@ -1,7 +1,7 @@
 {
   "name": "helix",
   "displayName": "Team Helix",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "Visual surfaces and shared infrastructure for Claude Code: Start (routing a job to its surface), Spark (diverging), Canvas (deciding), Loop (building against a ratified bar), Arena (one question answered N times and judged), Swarm (one job cut into slices and merged), Stream (watching autonomous work), Archive (a session's story, kept read-only), Fleet (mission control), Memory (what we know), Vault (secrets agents never read), Rails (rules, standards and playbooks that bind), Shelf (artefacts kept once, referenced from any session).",
   "author": {
     "name": "Team Helix AI",

@@ -30,6 +30,10 @@ ${CLAUDE_PLUGIN_ROOT}/bin/helix canvas wait --canvas <slug> --since <cursor> [--
 - `up` opens the browser itself, from inside the binary. `--no-open` is for
   headless or scripted runs — never a way around a permission prompt. If a
   prompt is declined, hand the user `! open <url>` and carry on.
+- `up` also brings up Fleet (mission control) when it is down, and returns
+  `fleet: {url, started}`. Hand the user both links in one line —
+  `Board: <url> · Fleet: <fleet.url>` — so they know the overview is there.
+  `up` never opens Fleet in the browser; the user follows the link.
 - **Identify yourself on `up` (ratified):** pass `--agent` with your product
   name, lowercase (`claude`, `codex`, …) and `--model` with your exact model
   id (e.g. `claude-fable-5`). Fleet shows and filters sessions by them; a

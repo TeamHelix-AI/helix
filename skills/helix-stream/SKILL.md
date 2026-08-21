@@ -34,6 +34,10 @@ ${CLAUDE_PLUGIN_ROOT}/bin/helix stream wait --stream <slug> --since <cursor> [--
 - `up` opens the browser itself, from inside the binary. `--no-open` is for
   headless or scripted runs — never a way around a permission prompt. If a
   prompt is declined, hand the user `! open <url>` and carry on.
+- `up` also brings up Fleet (mission control) when it is down, and returns
+  `fleet: {url, started}`. Hand the user both links in one line —
+  `Board: <url> · Fleet: <fleet.url>` — so they know the overview is there.
+  `up` never opens Fleet in the browser; the user follows the link.
 
 Data: `~/.helix/stream/<project>/<slug>/` (SQLite event log + `server.json`)
 — one home for the whole machine, never inside a repo.

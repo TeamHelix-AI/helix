@@ -6,8 +6,10 @@ allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/bin/helix *)
 
 # Helix Fleet
 
-Mission control. Fleet is a **global singleton** (port 4890) that Canvas,
-Loop, and Stream servers register with automatically on start; they push
+Mission control. Fleet is a **global singleton** (port 4890). Every
+session `up` (spark, canvas, loop, arena, swarm, stream, archive) starts
+it when it is down and returns `fleet: {url, started}`, so the board is
+there whenever a session is; servers register with it on start, push
 their needs-you items on change, and Fleet health-pings them for
 liveness. Agents never push to Fleet — the only agent verbs are `up` and
 `status`.
@@ -52,9 +54,9 @@ ${CLAUDE_PLUGIN_ROOT}/bin/helix fleet status
    - stream → your `status` tile text
    - loop → the `loop.init` name
    Stale status = a lying Fleet row.
-3. Sessions started while Fleet was down appear on their next server
-   (re)start — if the user says a session is missing, rerun that app's
-   `up` (same slug/port; open tabs reconnect).
+3. A session `up` starts Fleet if needed, so rows rarely go missing. If
+   the user says one is, rerun that app's `up` (same slug/port; open tabs
+   reconnect) — it re-registers.
 
 ## When the user asks "what needs me?"
 

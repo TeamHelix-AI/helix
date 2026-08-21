@@ -30,6 +30,11 @@ ${CLAUDE_PLUGIN_ROOT}/bin/helix arena wait --arena <slug> --since <cursor> [--ti
 Data: `~/.helix/arena/<project>/<slug>/` — one home for the whole machine,
 never inside a repo.
 
+- `up` also brings up Fleet (mission control) when it is down, and returns
+  `fleet: {url, started}`. Hand the user both links in one line —
+  `Board: <url> · Fleet: <fleet.url>` — so they know the overview is there.
+  `up` never opens Fleet in the browser; the user follows the link.
+
 Exit codes: 0 delta, 2 invalid, 3 timeout, 4 no-viewer, 5 down, **6 the plan
 is not ratified**.
 

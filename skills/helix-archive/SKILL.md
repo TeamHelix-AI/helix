@@ -40,6 +40,11 @@ machine, never inside a repo. One archived session, one slug: name it
 after the session's short topic (e.g. `vault-flake-hunt`). **Always pass
 `--dir`** with the project root in scripts (cwd is not reliable).
 
+- `up` also brings up Fleet (mission control) when it is down, and returns
+  `fleet: {url, started}`. Hand the user both links in one line —
+  `Board: <url> · Fleet: <fleet.url>` — so they know the overview is there.
+  `up` never opens Fleet in the browser; the user follows the link.
+
 Shell discipline (same as siblings): always call the binary by its full
 path; heredocs (`<<'EOF'`) for push payloads, never `echo`.
 
